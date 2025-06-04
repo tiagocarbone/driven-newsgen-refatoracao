@@ -12,6 +12,10 @@
 
 - funcoes getSpecificNews(), alterNews() e deleteNews() violam DRY na verificacao de ID;
 
+# Arquivo news-service.ts
+
+- funcao validate() com mais de 1 responsabilidade 
+
 # Arquivo error-handler.ts
 
 - melhorar um pouco a complexidade de lógica booleana;

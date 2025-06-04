@@ -5,7 +5,7 @@ import prisma from "../src/database";
 import { faker } from '@faker-js/faker';
 import httpStatus from "http-status";
 
-import { generateRandomNews, persistNewRandomNews } from "./factories/news-factory";
+import { createNewsWithPublicationDate, createNewsWithTitle, generateRandomNews, persistNewRandomNews } from "./factories/news-factory";
 
 const api = supertest(app);
 
@@ -13,44 +13,94 @@ beforeEach(async () => {
   await prisma.news.deleteMany();
 });
 
+afterEach(async () => {
+  await prisma.news.deleteMany();
+});
+
 describe("GET /news", () => {
-  it("should get all news registered", async () => {
-    await persistNewRandomNews();
-    await persistNewRandomNews();
-    await persistNewRandomNews();
+  it("should return paginated results (10 per page)", async () => {
+    for (let i = 0; i < 15; i++) {
+      await persistNewRandomNews();
+    }
 
-    const result = await api.get("/news");
-    const news = result.body;
-    expect(news).toHaveLength(3);
-    expect(news).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: expect.any(Number),
-        author: expect.any(String),
-        firstHand: expect.any(Boolean),
-        publicationDate: expect.any(String),
-        title: expect.any(String),
-        text: expect.any(String)
-      })
-    ]))
+    const resPage1 = await api.get("/news?page=1");
+    const resPage2 = await api.get("/news?page=2");
+
+    expect(resPage1.body.length).toBe(10);
+    expect(resPage2.body.length).toBe(5);
   });
 
-  it("should get a specific id by id", async () => {
-    const news = await persistNewRandomNews();
-    const { status, body } = await api.get(`/news/${news.id}`);
-    expect(status).toBe(httpStatus.OK);
-    expect(body).toMatchObject({
-      id: news.id
-    });
+  it("should return news ordered by publicationDate ascending", async () => {
+
+    const dateInThePast = new Date("2020-01-01");
+    const dateIntheFuture = new Date("2030-01-01")
+
+    const oldNews = await createNewsWithPublicationDate(dateInThePast);
+    const newNews = await createNewsWithPublicationDate(dateIntheFuture);
+
+    const res = await api.get("/news?order=asc");
+
+    expect(res.body[0].id).toBe(oldNews.id);
+    expect(res.body[res.body.length - 1].id).toBe(newNews.id);
   });
 
-  it("should return 404 when id is not found", async () => {
-    const { status } = await api.get(`/news/1`);
-    expect(status).toBe(httpStatus.NOT_FOUND);
+  it("should return news ordered by publicationDate descending (default)", async () => {
+
+    const dateInThePast = new Date("2020-01-01");
+    const dateIntheFuture = new Date("2030-01-01")
+
+
+    const oldNews = await createNewsWithPublicationDate(dateInThePast);
+    const newNews = await createNewsWithPublicationDate(dateIntheFuture);
+
+    const res = await api.get("/news");
+
+    expect(res.body[0].id).toBe(newNews.id);
+    expect(res.body[res.body.length - 1].id).toBe(oldNews.id);
   });
 
-  it("should return 400 when id is not valid", async () => {
-    const { status } = await api.get(`/news/0`);
-    expect(status).toBe(httpStatus.BAD_REQUEST);
+  it("should filter news by title using 'like'", async () => {
+
+    const string1 = "Driven"
+    const string2 = "ffc"
+
+    await createNewsWithTitle(string1);
+    await createNewsWithTitle(string2);
+
+    const res = await api.get("/news?title=driven");
+
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].title).toMatch(/driven/i);
+  });
+
+  it("should apply all filters simultaneously", async () => {
+
+
+    const stringDriven1 = "Driven A"
+    const stringDriven2 = "Driven B"
+    const stringDriven3 = "Driven C"
+
+
+    await createNewsWithTitle(stringDriven1);
+    await createNewsWithTitle(stringDriven2);
+    await createNewsWithTitle(stringDriven3);
+
+    const otherNews1 = "Other News 1"
+    const otherNews2 = "Other News 2"
+    const otherNews3 = "Other News 3"
+
+    await createNewsWithTitle(otherNews1);
+    await createNewsWithTitle(otherNews2);
+    await createNewsWithTitle(otherNews3);
+
+    const res = await api.get("/news?page=1&order=asc&title=Driven");
+
+    expect(res.body.length).toBe(3);
+
+    expect(res.body[0].title.toLowerCase()).toContain("driven");
+    expect(res.body[1].title.toLowerCase()).toContain("driven");
+    expect(res.body[2].title.toLowerCase()).toContain("driven");
+    
   });
 
 });

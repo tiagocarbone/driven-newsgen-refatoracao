@@ -15,18 +15,13 @@ export default function errorHandlingMiddleware(
   console.log(error);
 
   const { name, message } = error;
-  if (name === "NotFound") {
-    return res.status(httpStatus.NOT_FOUND).send(message);
-  } else if (name === "Conflict") {
-    return res.status(httpStatus.CONFLICT).send(message);
-  } else if (name === "BadRequest") {
-    return res.status(httpStatus.BAD_REQUEST).send(message);
-  } else if (name === "UnprocessableEntity") {
-    return res.status(httpStatus.UNPROCESSABLE_ENTITY).send(message);
-  } else if (name === "Forbidden") {
-    return res.status(httpStatus.FORBIDDEN).send(message);
-  } else {
-    return res.status(httpStatus.INTERNAL_SERVER_ERROR);
-  }
+  if (name === "NotFound") return res.status(httpStatus.NOT_FOUND).send(message);
+  if (name === "Conflict") return res.status(httpStatus.CONFLICT).send(message);
+  if (name === "BadRequest") return res.status(httpStatus.BAD_REQUEST).send(message);
+  if (name === "UnprocessableEntity") return res.status(httpStatus.UNPROCESSABLE_ENTITY).send(message);
+  if (name === "Forbidden") return res.status(httpStatus.FORBIDDEN).send(message);
+
+  return res.status(httpStatus.INTERNAL_SERVER_ERROR);
+  
 
 }

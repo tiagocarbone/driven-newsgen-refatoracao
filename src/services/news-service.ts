@@ -2,69 +2,77 @@ import prisma from "../database";
 import * as newsRepository from "../repositories/news-repository";
 import { AlterNewsData, CreateNewsData } from "../repositories/news-repository";
 
-export async function getNews() {
-  return newsRepository.getNoticias();
+
+type GetNewsParams = {
+  page: number;
+  order: "asc" | "desc";
+  title?: string;
+};
+
+export async function getNews(params: GetNewsParams) {
+  return newsRepository.getNews(params);
 }
 
 export async function getSpecificNews(id: number) {
-  const news = await newsRepository.getNoticiaById(id);
+  const news = await newsRepository.getNewsById(id);
   if (!news) {
-    throw {
-      name: "NotFound",
-      message: `News with id ${id} not found.`
-    }
+    const error = new Error(`News with id ${id} not found.`);
+    error.name = "NotFound";
+    throw error;
   }
 
   return news;
 }
 
 export async function createNews(newsData: CreateNewsData) {
-  await validate(newsData);
-  return newsRepository.createNoticia(newsData);
+  await validateNews(newsData);
+  return newsRepository.createNews(newsData);
 }
 
 export async function alterNews(id: number, newsData: AlterNewsData) {
   const news = await getSpecificNews(id);
-  await validate(newsData, news.title !== newsData.title);
+  await validateNews(newsData, news.title !== newsData.title);
 
-  return newsRepository.updateNoticia(id, newsData);
+  return newsRepository.updateNews(id, newsData);
 }
 
 export async function deleteNews(id: number) {
   await getSpecificNews(id);
-  return newsRepository.removeNoticia(id);
+  return newsRepository.removeNews(id);
 }
 
-async function validate(newsData: CreateNewsData, isNew = true) {
-  // validate if news with specific text already exists
-  if (isNew) {
-    const newsWithTitle = await prisma.news.findFirst({
-      where: { title: newsData.title }
-    });
+export async function validateNews(newsData: CreateNewsData, isNew = true) {
+  if (isNew) await ensureTitleIsUnique(newsData.title);
+  validateTextLength(newsData.text);
+  validatePublicationDate(newsData.publicationDate);
+}
 
-    if (newsWithTitle) {
-      throw {
-        name: "Conflict",
-        message: `News with title ${newsData.title} already exist`
-      }
-    }
-  }
-
-  // checks news text length
-  if (newsData.text.length < 500) {
-    throw {
-      name: "BadRequest",
-      message: "The news text must be at least 500 characters long.",
-    };
-  }
-
-  // checks date
-  const currentDate = new Date();
-  const publicationDate = new Date(newsData.publicationDate);
-  if (publicationDate.getTime() < currentDate.getTime()) {
-    throw {
-      name: "BadRequest",
-      message: "The publication date cannot be in the past.",
-    };
+async function ensureTitleIsUnique(title: string) {
+  const existingNews = await prisma.news.findFirst({ where: { title } });
+  if (existingNews) {
+    const error = new Error(`News with title "${title}" already exists.`);
+    error.name = "Conflict";
+    throw error;
   }
 }
+
+
+function validateTextLength(text: string) {
+  if (text.length < 500) {
+    const error = new Error("The news text must be at least 500 characters long.");
+    error.name = "BadRequest";
+    throw error;
+  }
+}
+
+
+
+function validatePublicationDate(date: string | Date) {
+  const publicationDate = new Date(date);
+  if (publicationDate.getTime() < Date.now()) {
+    const error = new Error("The publication date cannot be in the past.");
+    error.name = "BadRequest";
+    throw error;
+  }
+}
+

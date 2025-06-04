@@ -5,16 +5,19 @@ import * as service from "./../services/news-service";
 
 import { AlterNewsData, CreateNewsData } from "../repositories/news-repository";
 
+
 export async function getNews(req: Request, res: Response) {
-  const news = await service.getNews();
+  const page = Number(req.query.page) || 1;
+  const order = req.query.order === "asc" ? "asc" : "desc";
+  const title = typeof req.query.title === "string" ? req.query.title : undefined;
+
+  const news = await service.getNews({ page, order, title });
   return res.send(news);
 }
 
 export async function getSpecificNews(req: Request, res: Response) {
-  const id = parseInt(req.params.id);
-  if (isNaN(id) || id <= 0) {
-    return res.status(httpStatus.BAD_REQUEST).send("Id is not valid.");
-  }
+
+  const id = validateId(req.params.id)
 
   const news = await service.getSpecificNews(id);
   return res.send(news);
@@ -28,10 +31,8 @@ export async function createNews(req: Request, res: Response) {
 }
 
 export async function alterNews(req: Request, res: Response) {
-  const id = parseInt(req.params.id);
-  if (isNaN(id) || id <= 0) {
-    return res.status(httpStatus.BAD_REQUEST).send("Id is not valid.");
-  }
+
+  const id = validateId(req.params.id)
 
   const newsData = req.body as AlterNewsData;
   const alteredNews = await service.alterNews(id, newsData);
@@ -40,11 +41,20 @@ export async function alterNews(req: Request, res: Response) {
 }
 
 export async function deleteNews(req: Request, res: Response) {
-  const id = parseInt(req.params.id);
-  if (isNaN(id) || id <= 0) {
-    return res.status(httpStatus.BAD_REQUEST).send("Id is not valid.");
-  }
 
+  const id = validateId(req.params.id)
   await service.deleteNews(id);
   return res.sendStatus(httpStatus.NO_CONTENT);
+}
+
+
+
+export function validateId(idParam: string): number {
+  const id = parseInt(idParam);
+  if (isNaN(id) || id <= 0) {
+    const error = new Error("Id is not valid.");
+    error.name = "BadRequest";
+    throw error;
+  }
+  return id;
 }
